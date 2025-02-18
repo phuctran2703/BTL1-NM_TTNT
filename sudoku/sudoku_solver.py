@@ -1,5 +1,6 @@
 import pygame
 import time
+import tracemalloc
 from sudoku_initialization import *
 
 class SudokuSolver:
@@ -97,7 +98,7 @@ class SudokuSolver:
         # Chọn ô có ít lựa chọn nhất (MRV - Minimum Remaining Values)
         x, y = min(empty_cells, key=lambda cell: self.heuristic_num_value(cell[0], cell[1]))
 
-        # Lấy danh sách giá trị có thể điền, ưu tiên Least-Constraining Value
+        # Lấy danh sách giá trị có thể điền, ưu tiên Degree Heuristic
         possible_values = sorted(self.possible_values(x, y), key=lambda val: self.heuristic_degree(x, y, val))
 
         for num in possible_values:
@@ -120,16 +121,26 @@ def compare_algorithms():
     solver1 = SudokuSolver(board1.board)
     solver2 = SudokuSolver(board2.board)
 
+    # Measure DFS memory usage
+    tracemalloc.start()
     start_time = time.time()
     solver1.solve_by_dfs()
     dfs_time = time.time() - start_time
+    dfs_memory = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
 
+    # Measure Greedy memory usage
+    tracemalloc.start()
     start_time = time.time()
     solver2.solve_by_greedy()
     greedy_time = time.time() - start_time
+    greedy_memory = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
 
     print(f"DFS Time: {dfs_time} seconds")
+    print(f"DFS Memory: {dfs_memory[1] - dfs_memory[0]} bytes")
     print(f"Greedy Time: {greedy_time} seconds")
+    print(f"Greedy Memory: {greedy_memory[1] - greedy_memory[0]} bytes")
 
 if __name__ == "__main__":
     for i in range(1):

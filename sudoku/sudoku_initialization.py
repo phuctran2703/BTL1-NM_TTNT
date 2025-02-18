@@ -1,5 +1,6 @@
 import random
 import numpy as np
+import sys
 
 BOARD_SIZE = 9 # Kích thước của bảng sudoku
 
@@ -66,6 +67,11 @@ class Board:
         for row in self.board:
             print([cell.value for cell in row])
 
+    def memory_usage(self):
+        """Tính toán độ tiêu tốn bộ nhớ của bảng Sudoku"""
+        return sys.getsizeof(self.board) + sum(sys.getsizeof(cell) for row in self.board for cell in row)
+
 if __name__ == "__main__":
     sudoku = Board()
     sudoku.show_values()
+    print(sudoku.memory_usage())
