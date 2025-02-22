@@ -13,6 +13,9 @@ class Cell:
         self.y = y
         self.value = value
         self.fixed = True
+    
+    def __lt__(self, other):
+        return (self.x, self.y) < (other.x, other.y)
 
 class Board:
     def __init__(self):

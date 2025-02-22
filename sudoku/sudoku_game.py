@@ -72,6 +72,7 @@ class Game:
         self.start_button = self.draw_button("Start Game", (WINDOW_SIZE - 300) // 2, WINDOW_SIZE // 2, 300, 50, BLUE)
         self.dfs_button = self.draw_button("Solving by DFS", (WINDOW_SIZE - 300) // 2, WINDOW_SIZE // 2 + 70, 300, 50, BLUE)
         self.greedy_button = self.draw_button("Solving by Greedy", (WINDOW_SIZE - 300) // 2, WINDOW_SIZE // 2 + 140, 300, 50, BLUE)
+        self.astar_button = self.draw_button("Solving by Astar", (WINDOW_SIZE - 300) // 2, WINDOW_SIZE // 2 + 210, 300, 50, BLUE)
 
     def draw_end_screen(self):
         """Vẽ màn hình kết thúc"""
@@ -94,7 +95,10 @@ class Game:
             elif self.greedy_button.collidepoint(pos):
                 self.state = "solving_by_greedy"
                 self.solver.solve_by_greedy()
-        elif self.state == "playing" or self.state == "solving_by_dfs" or self.state == "solving_by_greedy":
+            elif self.astar_button.collidepoint(pos):
+                self.state = "solving_by_astar"
+                self.solver.solve_by_astar()
+        elif self.state == "playing" or self.state == "solving_by_dfs" or self.state == "solving_by_greedy" or self.state == "solving_by_astar":
             if self.submit_button.collidepoint(pos):
                 self.win = self.board.is_solved()
                 self.state = "end"
