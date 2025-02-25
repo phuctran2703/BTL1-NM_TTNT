@@ -6,6 +6,7 @@ import time
 import json
 from pipePuzzle import *
 import os
+import copy
 
 os.environ['SDL_WINDOW_CENTERED'] = '1'  # Center all pygame windows
 
@@ -17,6 +18,9 @@ icon = pygame.image.load("assets/icon.png")
 pygame.display.set_icon(icon)
 screen = pygame.display.set_mode(size)
 
+# Default cell width for drawing the puzzle
+CELL_WIDTH = 50  # This will be dynamically adjusted based on puzzle size
+
 # Colors
 BACKGROUND = (28, 37, 65)     # Deep navy blue background
 PRIMARY = (86, 171, 147)      # Teal/mint green for pipes
@@ -25,6 +29,7 @@ ACCENT = (255, 140, 85)       # Coral orange for accents/highlights
 TEXT_COLOR = (226, 232, 240)  # Light gray for text
 BUTTON_HOVER = (108, 195, 171) # Lighter teal for hover states
 GAME_AREA = (34, 44, 77)      # Slightly lighter than background for game area
+ERROR_COLOR = (255, 99, 71)   # Tomato red for error messages
 
 # Fonts
 TITLE_FONT = pygame.font.SysFont('Corbel', 72)
@@ -51,9 +56,9 @@ GRAPHS = [
 ]
 
 # Stats
-blind_stats = {'start_time': 0, 'end_time': 0, 'max_nodes': 0, 'loop': 0, 'mem_storage': [0, 0]}
+blind_stats = {'start_time': 0, 'end_time': 0, 'max_nodes': 0, 'loop': 0, 'mem_storage': [0, 0], 'status': ''}
 heuristic_stats = {'start_time': 0, 'end_time': 0, 'pre_max_nodes': 0, 'pre_loop': 0, 
-                  'max_nodes': 0, 'loop': 0, 'mem_storage': [0, 0]}
+                  'max_nodes': 0, 'loop': 0, 'mem_storage': [0, 0], 'status': ''}
 
 BLIND_SOLVE = pygame.font.SysFont('Corbel', 20) .render('Blind Solve' , True , (0, 0, 0))
 HEURISTIC_SOLVE = pygame.font.SysFont('Corbel', 20) .render('Heuristic Solve' , True , (0, 0, 0))
@@ -144,12 +149,86 @@ def drawDemoSolve(graph: Graph, transforms: list[Transform], BaseX, BaseY):
             pygame.display.update()
             pygame.time.delay(300)
 
+def draw_loading_screen(message):
+    """Display a loading screen with the given message"""
+    screen.fill(BACKGROUND)
+    
+    # Create loading text
+    loading_text = TITLE_FONT.render(message, True, ACCENT)
+    screen.blit(loading_text, ((width - loading_text.get_width()) // 2, height // 2 - 50))
+    
+    # Create a pulsing animation
+    animation_time = (pygame.time.get_ticks() % 1000) / 1000.0  # Varies from 0 to 1
+    dot_count = int(animation_time * 6) + 1  # 1 to 6 dots
+    dots = "." * dot_count
+    
+    # Display dots
+    dots_text = MENU_FONT.render(dots, True, TEXT_COLOR)
+    screen.blit(dots_text, ((width - dots_text.get_width()) // 2, height // 2 + 20))
+    
+    pygame.display.flip()
+
+def draw_game_result(stats, result_message, success=True):
+    """Display algorithm results"""
+    screen.fill(BACKGROUND)
+    
+    # Title
+    title = TITLE_FONT.render(result_message, True, ACCENT if success else ERROR_COLOR)
+    screen.blit(title, ((width - title.get_width()) // 2, 100))
+    
+    # Stats
+    y_pos = 220
+    line_height = 40
+    
+    stats_items = [
+        f"Time taken: {stats['end_time'] - stats['start_time']:.2f} seconds",
+        f"Iterations: {stats['loop']}",
+        f"Max queue size: {stats['max_nodes']}",
+        f"Peak memory usage: {stats['mem_storage'][1] / 1024 / 1024:.2f} MB"
+    ]
+    
+    if 'status' in stats and stats['status']:
+        stats_items.append(f"Status: {stats['status']}")
+    
+    for item in stats_items:
+        stat_text = INFO_FONT.render(item, True, TEXT_COLOR)
+        screen.blit(stat_text, ((width - stat_text.get_width()) // 2, y_pos))
+        y_pos += line_height
+    
+    # Continue button
+    continue_button = pygame.Rect((width - 200) // 2, y_pos + 40, 200, 60)
+    draw_menu_button("Continue", continue_button)
+    
+    pygame.display.flip()
+    
+    # Wait for user to click continue
+    waiting_for_click = True
+    while waiting_for_click:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                sys.exit()
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if continue_button.collidepoint(pygame.mouse.get_pos()):
+                    waiting_for_click = False
+
 def solvedGraph(graph, type: str):
     solvedGraph: Graph = copy.deepcopy(graph)
     if type == 'blind':
-        return solvedGraph.blindSolve()
+        result = solvedGraph.blindSolve()
+        if result is None:
+            blind_stats['status'] = "Could not find solution (limits reached)"
+            return None
+        else:
+            blind_stats['status'] = "Solution found"
+            return result
     else:
-        return solvedGraph.heuristicSolve()
+        result = solvedGraph.heuristicSolve()
+        if result is None:
+            heuristic_stats['status'] = "Could not find solution (limits reached)"
+            return None
+        else:
+            heuristic_stats['status'] = "Solution found"
+            return result
     
 def draw_menu_button(text, rect, hover=False):
     color = BUTTON_HOVER if hover else SECONDARY
@@ -233,45 +312,74 @@ def draw_game_screen():
     screen.blit(title, ((width - title.get_width()) // 2, 50))
     
     # Calculate cell size based on puzzle dimensions
+    global CELL_WIDTH
     max_puzzle_size = min(800, min(width, height) - 200)  # Leave margin
-    cell_size = min(100, max_puzzle_size // max(mainGraph.row, mainGraph.col))
+    CELL_WIDTH = min(100, max_puzzle_size // max(mainGraph.row, mainGraph.col))
     
     # Center position
-    puzzle_width = cell_size * mainGraph.col
-    puzzle_height = cell_size * mainGraph.row
+    puzzle_width = CELL_WIDTH * mainGraph.col
+    puzzle_height = CELL_WIDTH * mainGraph.row
     base_x = (width - puzzle_width) // 2
     base_y = (height - puzzle_height) // 2
     
     # Draw puzzle
     for i in range(mainGraph.row):
         for j in range(mainGraph.col):
-            x = base_x + j * cell_size
-            y = base_y + i * cell_size
+            x = base_x + j * CELL_WIDTH
+            y = base_y + i * CELL_WIDTH
             t = type(mainGraph.graph[i][j])
             index = mainGraph.graph[i][j].index
-            screen.blit(pipeImage(t, index, cell_size), (x, y))
+            screen.blit(pipeImage(t, index, CELL_WIDTH), (x, y))
     
     # Draw back button
     back_button = pygame.Rect(20, 20, 100, 40)
     draw_menu_button('Back', back_button)
     
-    return back_button, base_x, base_y, cell_size
+    return back_button, base_x, base_y, CELL_WIDTH
 
 def animate_solution(transforms, base_x, base_y, cell_size):
+    """Animate the solution by showing each transformation step by step"""
+    # Make a copy of the current graph to animate
+    graph_copy = copy.deepcopy(mainGraph)
+    
     for t in transforms:
         row, col = t.row, t.col
         x = base_x + col * cell_size
         y = base_y + row * cell_size
         
         for _ in range(t.times):
-            mainGraph.graph[row][col].leftRotate()
-            pipe_type = type(mainGraph.graph[row][col])
-            index = mainGraph.graph[row][col].index
+            # Redraw the entire screen to ensure it's up to date
+            screen.fill(BACKGROUND)
             
-            # Redraw entire screen
-            back_button, _, _, _ = draw_game_screen()
+            # Draw the title
+            title = TITLE_FONT.render(f"Puzzle {graph_copy.row}x{graph_copy.col} - Solving", True, ACCENT)
+            screen.blit(title, ((width - title.get_width()) // 2, 50))
+            
+            # Apply the transformation
+            graph_copy.graph[row][col].leftRotate()
+            
+            # Draw the current state of the puzzle
+            for i in range(graph_copy.row):
+                for j in range(graph_copy.col):
+                    pipe_x = base_x + j * cell_size
+                    pipe_y = base_y + i * cell_size
+                    pipe_type = type(graph_copy.graph[i][j])
+                    pipe_index = graph_copy.graph[i][j].index
+                    
+                    # Highlight the current pipe being rotated
+                    if i == row and j == col:
+                        # Draw a highlight behind the pipe
+                        highlight_rect = pygame.Rect(pipe_x-5, pipe_y-5, cell_size+10, cell_size+10)
+                        pygame.draw.rect(screen, ACCENT, highlight_rect, 3)
+                    
+                    screen.blit(pipeImage(pipe_type, pipe_index, cell_size), (pipe_x, pipe_y))
+            
+            # Add a status message
+            status = INFO_FONT.render(f"Rotating pipe at ({row+1},{col+1})", True, TEXT_COLOR)
+            screen.blit(status, ((width - status.get_width()) // 2, base_y + graph_copy.row * cell_size + 30))
+            
             pygame.display.flip()
-            pygame.time.delay(300)
+            pygame.time.delay(200)  # Slightly faster animation for better UX
 
 mainGraph = readGraph(FILENAMES[0])
 
@@ -325,20 +433,41 @@ while True:
                                 pygame.display.flip()
                                 
                                 if selected_algorithm == 'blind':
+                                    draw_loading_screen("Running Blind Search")
                                     blind_stats['start_time'] = time.time()
                                     tracemalloc.start()
-                                    transforms, blind_stats['max_nodes'], blind_stats['loop'] = solvedGraph(mainGraph, "blind")
+                                    
+                                    result = solvedGraph(mainGraph, "blind")
+                                    
                                     blind_stats['mem_storage'] = tracemalloc.get_traced_memory()
+                                    tracemalloc.stop()
                                     blind_stats['end_time'] = time.time()
-                                    animate_solution(transforms, base_x, base_y, cell_size)
+                                    
+                                    if result:
+                                        transforms, blind_stats['max_nodes'], blind_stats['loop'] = result
+                                        animate_solution(transforms, base_x, base_y, cell_size)
+                                        draw_game_result(blind_stats, "Blind Search Complete", True)
+                                    else:
+                                        draw_game_result(blind_stats, "Blind Search Failed", False)
+                                        
                                 else:
+                                    draw_loading_screen("Running Heuristic Search")
                                     heuristic_stats['start_time'] = time.time()
                                     tracemalloc.start()
-                                    transforms, heuristic_stats['pre_max_nodes'], heuristic_stats['max_nodes'], heuristic_stats['pre_loop'], heuristic_stats['loop'] = solvedGraph(mainGraph, "heuristic")
+                                    
+                                    result = solvedGraph(mainGraph, "heuristic")
+                                    
                                     heuristic_stats['mem_storage'] = tracemalloc.get_traced_memory()
                                     tracemalloc.stop()
                                     heuristic_stats['end_time'] = time.time()
-                                    animate_solution(transforms, base_x, base_y, cell_size)
+                                    
+                                    if result:
+                                        transforms, heuristic_stats['pre_max_nodes'], heuristic_stats['max_nodes'], heuristic_stats['pre_loop'], heuristic_stats['loop'] = result
+                                        animate_solution(transforms, base_x, base_y, cell_size)
+                                        draw_game_result(heuristic_stats, "Heuristic Search Complete", True)
+                                    else:
+                                        draw_game_result(heuristic_stats, "Heuristic Search Failed", False)
+                                        
                                 current_state = ALGORITHM_MENU
             
             elif current_state == GAME_SCREEN:

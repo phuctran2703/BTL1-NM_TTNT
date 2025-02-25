@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 import copy
 import heapq
 import pygame
+from collections import deque
+import time
 
 pygame.init()
 
@@ -126,7 +128,7 @@ class PriorityQueue:
 
     def delete(self):
         if not self.isEmpty():
-            return heapq.heappop(self.queue)[1]
+            return heapq.heappop(self.queue)
         else:
             raise IndexError("Queue is empty")
 
@@ -487,43 +489,125 @@ class Graph():
         return connected
 
     def blindSolve(self) -> tuple[list[Transform], int, int] | None:
-        queue: list[list[Transform]] = []
-    
+        from collections import deque
+        import time
+        
+        # Use a priority queue instead of a regular queue
+        # Each entry: (connected_components, unique_id, transforms)
+        priorityQueue = PriorityQueue()
+        priorityQueue.insert(float('inf'), {"transforms": []})  # Start with empty transform list properly structured
+        
+        # Set limits to prevent infinite processing
+        MAX_ITERATIONS = 100000
+        MAX_TIME_SECONDS = 30  # 30 seconds timeout
+        start_time = time.time()
+        
+        visited = set()  # Track visited states to avoid repeats
         maxElement = 0
         loop = 0
         
-        for i in range(self.row):
-            for j in range(self.col):
-                if self.graph[i][j].locked: continue
+        # Keep track of best solution so far (with fewest connected components)
+        best_connected = float('inf')
+        best_transforms = None
+        
+        try:
+            while not priorityQueue.isEmpty() and loop < MAX_ITERATIONS and time.time() - start_time < MAX_TIME_SECONDS:
+                loop += 1
+                maxElement = max(maxElement, priorityQueue.len())
                 
-                numberOfState = len(queue)  if queue != [] else 1
-                maxElement = maxElement if maxElement > numberOfState else numberOfState
+                # Get the state with the fewest connected components
+                current = priorityQueue.delete()
+                transforms = current[2]["transforms"]  # Now we can safely access this
                 
-                for _ in range(numberOfState):
-                    loop += 1
-                    front = queue.pop(0) if queue != [] else []
-                    temp = copy.deepcopy(self.graph)
-                    for k in range(len(front)):
-                        row = front[k].row
-                        col = front[k].col
-                        times = front[k].times
-                        for _ in range(times):
-                            temp[row][col].leftRotate()
-                    if type(temp[i][j]) is Ipipe:
-                        for _ in range(2):
-                            entry = copy.deepcopy(front) + [Transform(i, j, (_ + 1) % 2)]
-                            temp[i][j].leftRotate()
-                            if Graph.connectedComponent(temp) == 1:
-                                return entry, maxElement, loop
-                            queue += [entry]
-                    else:
-                        for _ in range(4):
-                            entry = copy.deepcopy(front) + [Transform(i, j, (_ + 1) % 4)]
-                            temp[i][j].leftRotate()
-                            if Graph.connectedComponent(temp) == 1:
-                                return entry, maxElement, loop
-                            queue += [entry]
+                # Apply all transforms to a copy of the graph
+                temp = copy.deepcopy(self.graph)
+                for t in transforms:
+                    row, col, times = t.row, t.col, t.times
+                    for _ in range(times):
+                        temp[row][col].leftRotate()
+                
+                # Generate a state hash to check if we've seen this state before
+                state_hash = self._get_state_hash(temp)
+                if state_hash in visited:
+                    continue
+                    
+                visited.add(state_hash)
+                
+                # Check if current state is a solution
+                connected = Graph.connectedComponent(temp)
+                if connected == 1:
+                    return transforms, maxElement, loop
+                
+                # Keep track of best solution so far
+                if connected < best_connected:
+                    best_connected = connected
+                    best_transforms = transforms
+                
+                # Try rotating each unlocked pipe
+                for i in range(self.row):
+                    for j in range(self.col):
+                        if temp[i][j].locked:
+                            continue
+                        
+                        original_pipe = copy.deepcopy(temp[i][j])
+                        
+                        # For I-pipes (2 rotations)
+                        if type(temp[i][j]) is Ipipe:
+                            for rot in range(1, 2):  # Only need to try one rotation
+                                # Apply the rotation
+                                temp_pipe = copy.deepcopy(original_pipe)
+                                for _ in range(rot):
+                                    temp_pipe.leftRotate()
+                                temp[i][j] = temp_pipe
+                                
+                                # Skip if this leads to an impossible state
+                                if noHopeState(temp, i, j):
+                                    continue
+                                    
+                                # Calculate connected components
+                                new_connected = Graph.connectedComponent(temp)
+                                new_transforms = transforms + [Transform(i, j, rot)]
+                                
+                                # Add to priority queue with connected components as priority
+                                priorityQueue.insert(new_connected, {"transforms": new_transforms})
+                        # For other pipes (4 rotations)
+                        else:
+                            for rot in range(1, 4):  # Try rotations 1, 2, and 3
+                                # Apply the rotation
+                                temp_pipe = copy.deepcopy(original_pipe)
+                                for _ in range(rot):
+                                    temp_pipe.leftRotate()
+                                temp[i][j] = temp_pipe
+                                
+                                # Skip if this leads to an impossible state
+                                if noHopeState(temp, i, j):
+                                    continue
+                                    
+                                # Calculate connected components
+                                new_connected = Graph.connectedComponent(temp)
+                                new_transforms = transforms + [Transform(i, j, rot)]
+                                
+                                # Add to priority queue with connected components as priority
+                                priorityQueue.insert(new_connected, {"transforms": new_transforms})
+                        
+                        # Restore original pipe
+                        temp[i][j] = original_pipe
+        except Exception as e:
+            print(f"Error in blindSolve: {e}")
+            return None
+        
+        # If we've hit a limit but have a partial solution, return it
+        if best_transforms is not None:
+            return best_transforms, maxElement, loop
         return None
+        
+    def _get_state_hash(self, graph):
+        """Generate a hash representation of the current graph state"""
+        state = []
+        for row in graph:
+            for cell in row:
+                state.append(cell.index)
+        return tuple(state)
 
     def heuristicSolve(self) -> tuple[list[Transform], int, int, int, int] | None:
         preTransforms, preMaxElement, preLoop = self.preProcessing()     
@@ -605,7 +689,6 @@ class Graph():
     
     def solve(self, transformSteps: list[Transform]):
         for _ in transformSteps:
-            # print(_.row, _.col, _.times)
             row = _.row
             col = _.col
             times = _.times
