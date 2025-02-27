@@ -71,8 +71,9 @@ class Game:
         self.screen.blit(text_surface, text_rect)
         self.start_button = self.draw_button("Start Game", (WINDOW_SIZE - 300) // 2, WINDOW_SIZE // 2, 300, 50, BLUE)
         self.dfs_button = self.draw_button("Solving by DFS", (WINDOW_SIZE - 300) // 2, WINDOW_SIZE // 2 + 70, 300, 50, BLUE)
-        self.greedy_button = self.draw_button("Solving by Greedy", (WINDOW_SIZE - 300) // 2, WINDOW_SIZE // 2 + 140, 300, 50, BLUE)
-        self.astar_button = self.draw_button("Solving by Astar", (WINDOW_SIZE - 300) // 2, WINDOW_SIZE // 2 + 210, 300, 50, BLUE)
+        self.astar_button = self.draw_button("Solving by Astar", (WINDOW_SIZE - 300) // 2, WINDOW_SIZE // 2 + 140, 300, 50, BLUE)
+        # self.greedy_button = self.draw_button("Solving by Greedy", (WINDOW_SIZE - 300) // 2, WINDOW_SIZE // 2 + 210, 300, 50, BLUE)
+        self.greedy_button = self.draw_button("Solving by Greedy", (WINDOW_SIZE - 300) // 2, WINDOW_SIZE // 2 + 210, 0, 0, BLUE)
 
     def draw_end_screen(self):
         """Vẽ màn hình kết thúc"""
