@@ -385,10 +385,6 @@ class Graph():
         priorityQueue = PriorityQueue()
         priorityQueue.insert(float('inf'), {"transforms": []})
         
-        MAX_ITERATIONS = 100000
-        MAX_TIME_SECONDS = 30
-        start_time = time.time()
-        
         visited = set()
         maxElement = 0
         loop = 0
@@ -396,7 +392,7 @@ class Graph():
         best_transforms = None
         
         try:
-            while not priorityQueue.isEmpty() and loop < MAX_ITERATIONS and time.time() - start_time < MAX_TIME_SECONDS:
+            while not priorityQueue.isEmpty():
                 loop += 1
                 maxElement = max(maxElement, priorityQueue.len())
                 

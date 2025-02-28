@@ -180,11 +180,15 @@ def draw_game_result(stats, result_message, success=True):
     y_pos = 220
     line_height = 40
     
+    # Convert time to milliseconds and memory to KB
+    time_ms = (stats['end_time'] - stats['start_time']) * 1000  # Convert to milliseconds
+    memory_kb = stats['mem_storage'][1] / 1024  # Convert to KB
+    
     stats_items = [
-        f"Time taken: {stats['end_time'] - stats['start_time']:.2f} seconds",
+        f"Time taken: {time_ms:.2f} ms",
         f"Iterations: {stats['loop']}",
         f"Max queue size: {stats['max_nodes']}",
-        f"Peak memory usage: {stats['mem_storage'][1] / 1024 / 1024:.2f} MB"
+        f"Peak memory usage: {memory_kb:.2f} KB"
     ]
     
     if 'status' in stats and stats['status']:
