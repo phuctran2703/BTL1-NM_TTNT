@@ -4,7 +4,7 @@ import resource
 import tracemalloc
 import time
 import json
-from pipePuzzle import *
+from algorithm import *
 import os
 import copy
 
@@ -393,18 +393,7 @@ while True:
         elif event.type == pygame.MOUSEBUTTONUP:
             mouse_pos = pygame.mouse.get_pos()
             
-            if current_state == MAIN_MENU:
-                buttons = draw_main_menu()
-                for text, rect in buttons:
-                    if rect.collidepoint(mouse_pos):
-                        if text == 'Play Game':
-                            current_state = PUZZLE_SIZE_MENU
-                        elif text == 'Solve with Algorithms':
-                            current_state = ALGORITHM_MENU
-                        elif text == 'Exit':
-                            sys.exit()
-            
-            elif current_state == ALGORITHM_MENU:
+            if current_state == ALGORITHM_MENU:
                 buttons = draw_algorithm_menu()
                 for text, rect in buttons:
                     if rect.collidepoint(mouse_pos):
